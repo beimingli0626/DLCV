@@ -201,25 +201,25 @@ def scaled_dot_product_no_loop_batch(
     multiplication to find the final output.
 
     args:
-        query: a Tensor of shape (N, K, M) where N is the batch size, K is the
+        query: a Tensor of shape (N, K_Q, M) where N is the batch size, K is the
             sequence length and M is the sequence embeding dimension
 
-        key:  a Tensor of shape (N, K, M) where N is the batch size, K is the
-            sequence length and M is the sequence embeding dimension
-
-
-        value: a Tensor of shape (N, K, V) where N is the batch size, K is the
+        key:  a Tensor of shape (N, K_K, M) where N is the batch size, K is the
             sequence length and M is the sequence embeding dimension
 
 
-        mask: a Bool Tensor of shape (N, K, K) that is used to mask the weights
+        value: a Tensor of shape (N, K_K, V) where N is the batch size, K is the
+            sequence length and M is the sequence embeding dimension
+
+
+        mask: a Bool Tensor of shape (N, K_Q, K_K) that is used to mask the weights
             used for computing weighted sum of values
 
 
     return:
-        y: a tensor of shape (N, K, M) that contains the weighted sum of values
+        y: a tensor of shape (N, K_Q, V) that contains the weighted sum of values
 
-        weights_softmax: a tensor of shape (N, K, K) that contains the softmaxed
+        weights_softmax: a tensor of shape (N, K_Q, K_K) that contains the softmaxed
             weight matrix.
 
     """
@@ -237,7 +237,7 @@ def scaled_dot_product_no_loop_batch(
     # weights can then be softmaxed to compute the final weighted sum of values   #
     # Hint: look at torch.bmm and torch.masked_fill                               #
     ###############################################################################
-    scaled_weights = query @ key.permute(0,2,1) / math.sqrt(M)  # (N, K, K) 
+    scaled_weights = query @ key.permute(0,2,1) / math.sqrt(M)  # (N, K_Q, K_K) 
 
     if mask is not None:
         ##########################################################################
@@ -246,8 +246,8 @@ def scaled_dot_product_no_loop_batch(
         ##########################################################################
         scaled_weights = scaled_weights.masked_fill(mask, -1e9)
 
-    weights_softmax = torch.softmax(scaled_weights, dim=2)  # (N, K, K)
-    y = weights_softmax @ value  # (N, K, V)
+    weights_softmax = torch.softmax(scaled_weights, dim=2)  # (N, K_Q, K_K)
+    y = weights_softmax @ value  # (N, K_Q, V)
     ##############################################################################
     #               END OF YOUR CODE                                             #
     ##############################################################################
@@ -310,12 +310,12 @@ class SelfAttention(nn.Module):
         An implementation of the forward pass of the self-attention layer.
 
         args:
-            query: Tensor of shape (N, K, M)
-            key: Tensor of shape (N, K, M)
-            value: Tensor of shape (N, K, M)
-            mask: Tensor of shape (N, K, K)
+            query: Tensor of shape (N, K_Q, M)
+            key: Tensor of shape (N, K_K, M)
+            value: Tensor of shape (N, K_K, V)
+            mask: Tensor of shape (N, K_Q, K_K)
         return:
-            y: Tensor of shape (N, K, dim_v)
+            y: Tensor of shape (N, K_Q, dim_v)
         """
         self.weights_softmax = (
             None  # weight matrix after applying self_attention_no_loop_batch
@@ -332,11 +332,18 @@ class SelfAttention(nn.Module):
         # of output weight matrix from self_attention_no_loop_batch to the       #
         # variable self.weights_softmax                                          #
         ##########################################################################
-        Q = self.q(query)  # (N, K, dim_q)
-        K = self.k(key)    # (N, K, dim_q)
-        V = self.v(value)  # (N, K, dim_v)
+        '''
+        self attention layer produce a 'context' matrix of the input sequence,
+        based on query & key & value, each context vector contains information
+        extracted from the whole sequence, the more relative word in a sequence would
+        end up with having higher weights
+        '''
+        
+        Q = self.q(query)  # (N, K_Q, dim_q)
+        K = self.k(key)    # (N, K_K, dim_q)
+        V = self.v(value)  # (N, K_K, dim_v)
 
-        # (N, K, dim_v)
+        # (N, K_Q, dim_v)
         y, self.weights_softmax = scaled_dot_product_no_loop_batch(Q, K, V, mask)
         ##########################################################################
         #               END OF YOUR CODE                                         #

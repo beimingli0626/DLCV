@@ -111,6 +111,16 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # hidden state and any values you need for the backward pass in the next_h
     # and cache variables respectively.
     ##########################################################################
+    '''
+    Vanilla RNN: with prev_h, we get the information from previous part of the 
+    input sequence, with x, we get the information of current input word. 
+    In other words, we are looking through the previous context, and then 
+    generating the estimation of the next state (and the next word).
+
+    Captioning RNN: the initial hidden state is projected from the extracted
+    image feature, therefore, we are actually generating the next word in caption
+    based on the image feature & the previous words
+    '''
     # use clone to solve in-place operation bug (?) in "autograd" check
     u = prev_h.clone() @ Wh + x @ Wx + b
     next_h = torch.tanh(u) # (N, H)
@@ -330,6 +340,11 @@ class WordEmbedding(nn.Module):
     def __init__(self, vocab_size: int, embed_size: int):
         super().__init__()
 
+        '''
+        For each word in vocabulary (vocab_size), we represent them as a
+        #embed_size dimension vectors, we initialize the word embedding here as
+        learnable parameters
+        '''
         # Register parameters
         self.W_embed = nn.Parameter(
             torch.randn(vocab_size, embed_size).div(math.sqrt(vocab_size))
@@ -341,8 +356,7 @@ class WordEmbedding(nn.Module):
         ######################################################################
         # TODO: Implement the forward pass for word embeddings.
         ######################################################################
-        # Replace "pass" statement with your code
-        out = self.W_embed[x]
+        out = self.W_embed[x] # (N, T, D)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -456,7 +470,7 @@ class CaptioningRNN(nn.Module):
         # (1) output projection (from RNN hidden state to vocab probability)
         # (2) feature projection (from CNN pooled feature to h0)
         ######################################################################
-        # image feature extractor
+        # image feature extractor, output (B, out_channels, H/stride, W/stride)
         self.encoder = ImageEncoder(pretrained=image_encoder_pretrained)
 
         # project from image feature to initial hidden state
@@ -465,6 +479,7 @@ class CaptioningRNN(nn.Module):
                                               nn.Flatten(),       # N, D
                                               nn.Linear(input_dim, hidden_dim))
         elif cell_type is "attn":
+            # (B, out_channels (input_dim), H/32, W/32) -> (B, hidden_dim, H/32, W/32)
             self.feature_proj = nn.Conv2d(input_dim, hidden_dim, 1, stride=1, padding=0)
 
         # word embedding
@@ -533,11 +548,11 @@ class CaptioningRNN(nn.Module):
         #         and project features to initial hidden state
         N = images.shape[0]
         features = self.encoder(images) # N, Output_Channel, 4, 4
-        h0 = self.feature_proj(features) # N, H / N, H, 4, 4
+        h0 = self.feature_proj(features) # (N, H) / (N, H, 4, 4)
 
         # Step 2: transform words from indices to vectors
         #         each vector is "W"-dimension, each image has "T" caption words
-        embedded = self.embedding(captions_in) # N, T, W
+        embedded = self.embedding(captions_in) # (N, T) -> (N, T, W)
       
         # Step 3: calculate the hidden state for all timesteps based on 
         #         work embedding & h0
@@ -609,11 +624,15 @@ class CaptioningRNN(nn.Module):
         # to $A$ of shape Hx4x4. The LSTM initial hidden state and cell state
         # would both be A.mean(dim=(2, 3)).
         #######################################################################
-        
+        '''
+        When sampling caption, we are performing ONE-to-MANY jobs with our
+        trained RNN model
+        '''
+
         # get the image features from backbone network and get initial hidden state
         N = images.shape[0]
         features = self.encoder(images) # N, Output_Channel, 4, 4
-        prev_words = torch.full((N,), self._start) # (N,), all captions start with START
+        prev_words = torch.full((N,), self._start) # (N,), all captions start with <START>
 
         if self.cell_type is "rnn":
             prev_h = self.feature_proj(features) # N, H
@@ -637,16 +656,16 @@ class CaptioningRNN(nn.Module):
             elif self.cell_type is "lstm":
                 prev_h, prev_c = self.caption_model.step_forward(embedded, prev_h, prev_c) # (N, H)
             elif self.cell_type is "attn":
-                attn, attn_weights = dot_product_attention(prev_h, A) # (N, H) & (N, 4, 4) 
+                attn, attn_weights = dot_product_attention(prev_h, A) # get (N, H) & (N, 4, 4) 
                 attn_weights_all[:, i] = attn_weights
                 prev_h, prev_c = self.caption_model.step_forward(embedded, prev_h, prev_c, attn) # (N, H)
 
             # Step 3: Apply the learned affine transformation to the next hidden 
             # state to get scores for all words in the vocabulary
-            voc = self.output_proj(prev_h)
+            voc = self.output_proj(prev_h) # N, V
 
             # Step 4: Select the word with the highest score as the next word
-            prev_words = torch.argmax(voc, axis=1)
+            prev_words = torch.argmax(voc, axis=1) # (N,), contain index of next words
             captions[:, i] = prev_words
 
         ######################################################################
@@ -707,6 +726,12 @@ class LSTM(nn.Module):
         ######################################################################
         # TODO: Implement the forward pass for a single timestep of an LSTM.
         ######################################################################
+        '''
+        i: Input gate, whether to write to cell;
+        f: Forget gate, Whether to erase cell;
+        o: Output gate, How much to reveal cell; 
+        g: Gate gate (?), How much to write to cell;
+        '''
         next_h = torch.zeros_like(prev_h)
         next_c = torch.zeros_like(prev_c)
       
