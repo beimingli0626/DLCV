@@ -181,11 +181,11 @@ def train(
             out_pos = out_pos.to(device)
             out = out.to(device)
             inp = inp.to(device)
-            gnd = out[:, 1:].contiguous().view(-1).long()
+            gnd = out[:, 1:].contiguous().view(-1).long() # ground truth output sequence
             optimizer.zero_grad()
 
             pred = model(inp.long(), inp_pos, out.long(), out_pos)
-            loss = loss_func(pred, gnd)
+            loss = loss_func(pred, gnd) # get the loss
             epoch_loss.append(loss.item())
             if warmup_interval is not None and iteration == warmup_interval:
                 print(
@@ -227,12 +227,12 @@ def val(model, dataloader, loss_func, batch_size, device=torch.device("cpu")):
         out_pos = out_pos.to(device)
         out = out.to(device)
         inp = inp.to(device)
-        gnd = out[:, 1:].contiguous().view(-1).long()
+        gnd = out[:, 1:].contiguous().view(-1).long() # (N, O), where O = K-1
         pred = model(inp.long(), inp_pos, out.long(), out_pos)
         loss = loss_func(pred, gnd)
 
-        pred_max = pred.max(1)[1]
-        gnd = gnd.contiguous().view(-1)
+        pred_max = pred.max(1)[1] # (N*O), with each entry has value 0<= value < V
+        gnd = gnd.contiguous().view(-1) # (N*O)
 
         n_correct = pred_max.eq(gnd)
         n_correct = n_correct.sum().item()
@@ -247,20 +247,23 @@ def val(model, dataloader, loss_func, batch_size, device=torch.device("cpu")):
 
 def inference(model, inp_exp, inp_exp_pos, out_pos_exp, out_seq_len):
     model.eval()
+    # hard coding BOS as starting word (index 14)
     y_init = torch.LongTensor([14]).unsqueeze(0).cuda().view(1, 1)
 
-    ques_emb = model.emb_layer(inp_exp)
-    q_emb_inp = ques_emb + inp_exp_pos
-    enc_out = model.encoder(q_emb_inp)
-    for i in range(out_seq_len - 1):
-        ans_emb = model.emb_layer(y_init)
-        a_emb_inp = ans_emb + out_pos_exp[:, : y_init.shape[1], :]
-        dec_out = model.decoder(a_emb_inp, enc_out, None)
-        _, next_word = torch.max(
-            dec_out[0, y_init.shape[1] - 1 : y_init.shape[1]], dim=1
-        )
+    ques_emb = model.emb_layer(inp_exp) # (1, K_in, emb_dim)
+    q_emb_inp = ques_emb + inp_exp_pos # (1, K_in, emb_dim)
+    enc_out = model.encoder(q_emb_inp) # (1, K_in, emb_dim)
 
-        y_init = torch.cat([y_init, next_word.view(1, 1)], dim=1)
+    # generating out_seq_len-1 words, because the first is definitely BOS
+    for i in range(out_seq_len - 1):
+        ans_emb = model.emb_layer(y_init) # (1, i+1, emb_dim)
+        a_emb_inp = ans_emb + out_pos_exp[:, : y_init.shape[1], :] # (1, i+1, emb_dim)
+        dec_out = model.decoder(a_emb_inp, enc_out, None) # (1, i+1, vocab_size)
+        _, next_word = torch.max(
+            dec_out[0, y_init.shape[1] - 1 : y_init.shape[1]], dim=1 # (1, vocab_size)
+        ) # (1, 1)
+
+        y_init = torch.cat([y_init, next_word.view(1, 1)], dim=1) # (1, i+2)
     return y_init, model
 
 

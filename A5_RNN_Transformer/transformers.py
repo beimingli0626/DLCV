@@ -443,6 +443,14 @@ class MultiHeadAttention(nn.Module):
         # output. Concatenate this list if tensors and pass them through the     #
         # nn.Linear mapping function defined in the initialization step.         #
         ##########################################################################
+        '''
+        Multihead Attention expands the models ability to focus on different positions.
+
+        This means that separate sections of the Embedding can learn different aspects 
+        of the meanings of each word, as it relates to other words in the sequence. 
+        This allows the Transformer to capture richer interpretations of the sequence. 
+        '''
+
         y = []
         for selfAttention in self.selfAttentions:
             y.append(selfAttention(query, key, value, mask))
@@ -495,11 +503,11 @@ class LayerNormalization(nn.Module):
         An implementation of the forward pass of the Layer Normalization.
 
         args:
-            x: a Tensor of shape (N, K, M) or (N, K) where N is the batch size, K
-                is the sequence length and M is the embedding dimension
+            x: a Tensor of shape (N, K_Q, V) or (N, K_Q) where N is the batch size, K
+                is the sequence length and V is the embedding dimension
 
         returns:
-            y: a Tensor of shape (N, K, M) or (N, K) after applying layer
+            y: a Tensor of shape (N, K_Q, V) or (N, K_Q) after applying layer
                 normalization
 
         """
@@ -511,11 +519,18 @@ class LayerNormalization(nn.Module):
         # these and shift this normalized input. Don't use torch.std to compute  # 
         # the standard deviation.                                                #
         ##########################################################################
-        mean = x.mean(-1, keepdim=True)  # (N, K, 1) / (N, 1)
-        var = x.var(-1, unbiased = False, keepdim=True)  # (N, K, 1) / (N, 1)
-        std = (var + self.epsilon).sqrt()  # (N, K, 1) / (N, 1)
-        norm_x = (x - mean) / std  # (N, K, M) / (N, K)
-        y = self.gamma * norm_x + self.beta  # (N, K, M) / (N, K)
+        '''
+        Layer normalization can be easily applied to recurrent neural networks by 
+        computing the normalization statistics separately at each time step.
+        This approach is effective at stabilising the hidden state dynamics in 
+        recurrent networks 
+        '''
+
+        mean = x.mean(-1, keepdim=True)  # (N, K_Q, 1) / (N, 1)
+        var = x.var(-1, unbiased = False, keepdim=True)  # (N, K_Q, 1) / (N, 1)
+        std = (var + self.epsilon).sqrt()  # (N, K_Q, 1) / (N, 1)
+        norm_x = (x - mean) / std  # (N, K_Q, V) / (N, K_Q)
+        y = self.gamma * norm_x + self.beta  # (N, K_Q, V) / (N, K_Q)
         ##########################################################################
         #               END OF YOUR CODE                                         #
         ##########################################################################
@@ -684,10 +699,15 @@ class EncoderBlock(nn.Module):
         ##########################################################################
         # TODO: Use the layer initialized in the init function to complete the   #
         # forward pass. As Multihead Attention takes in 3 inputs, use the same   #
-        # input thrice as the input. Follow the Figure 1 in Attention is All you #
+        # tensor as three input. Follow the Figure 1 in Attention is All you     #
         # Need paper to complete the rest of the forward pass. You can also take #
-        # reference from the architecture written in the fucntion documentation. #
+        # reference from the architecture written in the function documentation. #
         ##########################################################################
+        '''
+        inp - multi_head_attention - out1 - layer_norm(out1 + inp) - dropout - out2 
+        - feedforward - out3 - layer_norm(out3 + out2) - dropout - out
+        '''
+
         out1 = self.attention(x, x, x)
         out2 = self.norm1(out1 + x)
         out2 = self.dropout(out2)
@@ -725,6 +745,13 @@ def get_subsequent_mask(seq):
     # False where we don't have to apply the mask.                                #
     #                                                                             #
     ###############################################################################
+    '''
+    create mask like
+    |0, 1, 1|
+    |0, 0, 1|
+    |0, 0, 0|
+    '''
+
     N, K = seq.shape
     mask = torch.ones((N, K, K), device=seq.device, dtype=torch.bool)
     mask = ~torch.tril(mask)
@@ -748,9 +775,9 @@ class DecoderBlock(nn.Module):
 
         """
         The function implements the DecoderBlock for the Transformer model. In the 
-        class we learned about encoder only model that can be used for tasks like 
+        class we learned about encoder-only model that can be used for tasks like 
         sequence classification but for more complicated tasks like sequence to 
-        sequence we need a decoder network that can transformt the output of the 
+        sequence we need a decoder network that can transform the output of the 
         encoder to a target sequence. This kind of architecture is important in 
         tasks like language translation where we have a sequence as input and a 
         sequence as output. 
@@ -852,15 +879,16 @@ class DecoderBlock(nn.Module):
         dropout - (out2 and enc_out) -  multi_head_attention - out3 - \
         layer_norm(out3 + out2) - dropout - out4 - feed_forward - out5 - \
         layer_norm(out5 + out4) - dropout - out'''
-        out1 = self.attention_self(dec_inp, dec_inp, dec_inp, mask)
-        out2 = self.norm1(out1 + dec_inp)
-        out2 = self.dropout(out2)
-        out3 = self.attention_cross(out2, enc_inp, enc_inp)
-        out4 = self.norm2(out3 + out2)
-        out4 = self.dropout(out4)
-        out5 = self.feed_forward(out4)
-        out = self.norm3(out5 + out4)
-        y = self.dropout(out)
+        out1 = self.attention_self(dec_inp, dec_inp, dec_inp, mask) # (N, K2, M)
+        out2 = self.norm1(out1 + dec_inp) # (N, K2, M)
+        out2 = self.dropout(out2) # (N, K2, M)
+        out3 = self.attention_cross(out2, enc_inp, enc_inp) # query: out2, key&values: enc_inp
+                                                            # out3: (N, K2, M)
+        out4 = self.norm2(out3 + out2) # (N, K2, M)
+        out4 = self.dropout(out4) # (N, K2, M)
+        out5 = self.feed_forward(out4) # (N, K2, M)
+        out = self.norm3(out5 + out4) # (N, K2, M)
+        y = self.dropout(out) # (N, K2, M)
         ##########################################################################
         #               END OF YOUR CODE                                         #
         ##########################################################################
@@ -883,7 +911,7 @@ class Encoder(nn.Module):
         args:
             num_heads: int representing number of heads to be used in the
                 EncoderBlock
-            emb_dim: int repreesenting embedding dimension for the Transformer
+            emb_dim: int representing embedding dimension for the Transformer
                 model
             feedforward_dim: int representing hidden layer dimension for the
                 feed forward block
@@ -1038,7 +1066,7 @@ class Transformer(nn.Module):
         encodings. Similarily, the target is passed through the same nn.Embedding
         layer and added to the target positional encodings. The only difference
         is that we take last but one  value in the target. The summed 
-        inputs(look at the code for detials) are then sent through the encoder and  
+        inputs(look at the code for details) are then sent through the encoder and  
         decoder blocks  to get the  final output.
         args:
             num_heads: int representing number of heads to be used in Encoder
@@ -1095,12 +1123,16 @@ class Transformer(nn.Module):
 
         returns:
             dec_out: Tensor of shape (N*O, M) where O is the size of
-                the target sequence.
+                the target sequence, which it K_ans_b - 1.
         """
-        q_emb = self.emb_layer(ques_b)
-        a_emb = self.emb_layer(ans_b)
-        q_emb_inp = q_emb + ques_pos
-        a_emb_inp = a_emb[:, :-1] + ans_pos[:, :-1]
+
+        q_emb = self.emb_layer(ques_b) # embedding of input sequence, (N, K_Q_in, emb_dim)
+        a_emb = self.emb_layer(ans_b) # embedding of output sequence, (N, K_out, emb_dim)
+        q_emb_inp = q_emb + ques_pos # add positional encoding to input, (N, K_Q_in, emb_dim)
+        a_emb_inp = a_emb[:, :-1] + ans_pos[:, :-1] # add positional encodiong to 
+                                                    # the output, and cut off the 
+                                                    # last target word
+                                                    # (N, K_out, emb_dim)
         dec_out = None
         ##########################################################################
         # TODO: This portion consists of writing the forward part for the complete
@@ -1112,9 +1144,22 @@ class Transformer(nn.Module):
         # the values of the target(a_emb_inp)
         # Hint: the mask shape will depend on the Tensor ans_b
         ##########################################################################
-        enc_out = self.encoder(q_emb_inp)
+        '''
+        For complete transformer training process, checkout the 'train' function
+        implemented in 'a5_helper.py'
+        '''
+        
+        # Step 1: pass the input sequence to encoder, and get the output
+        enc_out = self.encoder(q_emb_inp) # (N, K_Q_in, V_in)
+
+        # Step 2: get mask for decoder, based on the shape of target output,
+        #         note that we are producing K-1 output sequence, instead of K
         mask = get_subsequent_mask(ans_b[:, :-1])
+
+        # Step 3: get the decoder output, which is the estimated sequence
         dec_out = self.decoder(a_emb_inp, enc_out, mask)
+
+        # Step 4: change the tensor form (N, O, M) -> (N * O, M)
         dec_out = torch.flatten(dec_out, 0, 1)
         ##########################################################################
         #               END OF YOUR CODE                                         #
