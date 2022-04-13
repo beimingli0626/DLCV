@@ -14,6 +14,6 @@ In this assignment, you will implement two different attention-based models, RNN
 - Use the Transformer model on a toy dataset
 
 Followings are some useful websites which help understanding the transformer machanism,
-- [TRANSFORMERS FROM SCRATCH](http://peterbloem.nl/blog/transformers)
+- [Transformers from scratch](http://peterbloem.nl/blog/transformers)
 - [The Annotated Transformer](http://nlp.seas.harvard.edu/2018/04/03/attention.html)
 - [The Illustrated Transformer](http://jalammar.github.io/illustrated-transformer/)

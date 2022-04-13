@@ -12,3 +12,6 @@ The goals of this assignment are:
 - Understand and implement a generative adversarial network and apply it to the MNIST dataset
 - Use image gradients to synthesize saliency maps, adversarial examples, and perform class visualizations
 - Combine content and style losses to perform artistic style transfer
+
+Followings are some useful websites which help understanding related machanisms,
+- [What is Transposed Convolutional Layer](https://towardsdatascience.com/what-is-transposed-convolutional-layer-40e5e6e31c11)

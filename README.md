@@ -18,5 +18,12 @@ In the second half of the course we will discuss applications of deep learning t
 - Video classification
 - Generative models (GANs, VAEs, autoregressive models)
 
+## Results
+
+### GAN
+| ![Vanilla GAN](results/fc_gan_results.png) | ![Least-Squares GAN](results/ls_gan_results.png) | ![Deeply-Convolutional GAN](results/dc_gan_results.png) |
+|:------------------------------------------:|:------------------------------------------------:|:-------------------------------------------------------:|
+|                Vanilla GAN                 |                Least-Squares GAN                 |                Deeply-Convolutional GAN                 |
+
 ## Credits
 As the BEST course I've ever taken, I really appreciate the effort of all instructors. It's a great start point for anyone who wants to step into CV-related industry or academia. For public course materials, you can visit [EECS 498.008 / 598.008 Deep Learning for Computer Vision](https://web.eecs.umich.edu/~justincj/teaching/eecs498/WI2022/) website.

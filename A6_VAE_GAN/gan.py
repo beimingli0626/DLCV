@@ -3,6 +3,7 @@ from __future__ import print_function
 import torch
 import torch.utils.data
 from torch import nn, optim
+from torch.nn import functional as F
 
 NOISE_DIM = 96
 
@@ -27,9 +28,9 @@ def sample_noise(batch_size, noise_dim, dtype=torch.float, device="cpu"):
     ##############################################################################
     # TODO: Implement sample_noise.                                              #
     ##############################################################################
-    # Replace "pass" statement with your code
-    pass
-
+    # Since "torch.rand" generates random values in [0,1), we transform
+    # the value to be between [-1, 1)
+    noise = 2 * torch.rand((batch_size, noise_dim), dtype=dtype, device=device) - 1
     ##############################################################################
     #                              END OF YOUR CODE                              #
     ##############################################################################
@@ -46,8 +47,14 @@ def discriminator():
     ############################################################################
     # TODO: Implement discriminator.                                           #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    model = nn.Sequential(
+        nn.Flatten(),
+        nn.Linear(784, 256), 
+        nn.LeakyReLU(0.01),
+        nn.Linear(256, 256),
+        nn.LeakyReLU(0.01),
+        nn.Linear(256, 1)   
+    )
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -63,8 +70,14 @@ def generator(noise_dim=NOISE_DIM):
     ############################################################################
     # TODO: Implement generator.                                               #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    model = nn.Sequential(
+        nn.Linear(noise_dim, 1024), 
+        nn.ReLU(),
+        nn.Linear(1024, 1024), 
+        nn.ReLU(),
+        nn.Linear(1024, 784),
+        nn.Tanh()
+    )
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -87,8 +100,24 @@ def discriminator_loss(logits_real, logits_fake):
     ##############################################################################
     # TODO: Implement discriminator_loss.                                        #
     ##############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    Update the discriminator (𝐷), to maximize the probability of the 
+    discriminator making the correct choice on real and generated data.
+
+    Note that we can use binary_cross_entropy_with_logits here, because
+    all targets label are either 0 or 1
+    '''
+    # Given a real image, the target output of discriminator should be 1
+    targets_real = torch.ones_like(logits_real) # (N, )
+    loss_real = F.binary_cross_entropy_with_logits(logits_real, targets_real)
+    
+    # Given a fake image, the target output of discriminator should be 0
+    targets_fake = torch.zeros_like(logits_fake) # (N, )
+    loss_fake = F.binary_cross_entropy_with_logits(logits_fake, targets_fake)
+
+    # BCE has already taken into account the negative sign and the mean, given
+    # that default reduction="mean"
+    loss = loss_real + loss_fake
     ##############################################################################
     #                              END OF YOUR CODE                              #
     ##############################################################################
@@ -109,8 +138,16 @@ def generator_loss(logits_fake):
     ##############################################################################
     # TODO: Implement generator_loss.                                            #
     ##############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    Update the generator (𝐺) to maximize the probability of the discriminator 
+    making the incorrect choice on generated data.
+    '''
+    # We want the generator to generator to generate good image which fools discriminator
+    targets_fake = torch.ones_like(logits_fake) # (N, )
+    
+    # BCE has already taken into account the negative sign and the mean, given
+    # that default reduction="mean"
+    loss = F.binary_cross_entropy_with_logits(logits_fake, targets_fake)
     ##############################################################################
     #                              END OF YOUR CODE                              #
     ##############################################################################
@@ -132,8 +169,7 @@ def get_optimizer(model):
     ##############################################################################
     # TODO: Implement optimizer.                                                 #
     ##############################################################################
-    # Replace "pass" statement with your code
-    pass
+    optimizer = optim.Adam(model.parameters(), lr=1e-3, betas=(0.5, 0.999))
     ##############################################################################
     #                              END OF YOUR CODE                              #
     ##############################################################################
@@ -155,8 +191,17 @@ def ls_discriminator_loss(scores_real, scores_fake):
     ##############################################################################
     # TODO: Implement ls_discriminator_loss.                                     #
     ##############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    Update the discriminator (𝐷), to maximize the probability of the 
+    discriminator making the correct choice on real and generated data:
+    '''
+    loss_real = (scores_real - 1) ** 2
+    loss_real = 0.5 * loss_real.mean()
+
+    loss_fake = scores_fake ** 2
+    loss_fake = 0.5 * loss_fake.mean()
+
+    loss = loss_real + loss_fake
     ##############################################################################
     #                              END OF YOUR CODE                              #
     ##############################################################################
@@ -177,8 +222,14 @@ def ls_generator_loss(scores_fake):
     ##############################################################################
     # TODO: Implement ls_generator_loss.                                         #
     ##############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    Update the generator (𝐺) to maximize the probability of the discriminator 
+    making the incorrect choice on generated data.
+    '''
+    loss_fake = (scores_fake - 1) ** 2
+    loss_fake = 0.5 * loss_fake.mean()
+
+    loss = loss_fake
     ##############################################################################
     #                              END OF YOUR CODE                              #
     ##############################################################################
@@ -194,8 +245,20 @@ def build_dc_classifier():
     ############################################################################
     # TODO: Implement build_dc_classifier.                                     #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    # model input size: (N, 784)
+    model = nn.Sequential(
+        nn.Unflatten(dim=1, unflattened_size=(1, 28, 28)), # (N, 1, 28, 28)
+        nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, stride=1), # (N, 32, 24, 24)
+        nn.LeakyReLU(0.01),
+        nn.MaxPool2d(kernel_size=2, stride=2), # (N, 32, 12, 12)
+        nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, stride=1), # (N, 64, 8, 8)
+        nn.LeakyReLU(0.01),
+        nn.MaxPool2d(kernel_size=2, stride=2), # (N, 64, 4, 4)
+        nn.Flatten(), # (N, 64 * 4 * 4)
+        nn.Linear(4 * 4 * 64, 4 * 4 * 64),
+        nn.LeakyReLU(0.01),
+        nn.Linear(4 * 4 * 64, 1)
+    )
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -212,8 +275,26 @@ def build_dc_generator(noise_dim=NOISE_DIM):
     ############################################################################
     # TODO: Implement build_dc_generator.                                      #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    # model input size: (N, noise_dim)
+    model = nn.Sequential(
+        nn.Linear(noise_dim, 1024),
+        nn.ReLU(),
+        nn.BatchNorm1d(1024),
+        nn.Linear(1024, 7 * 7 * 128),
+        nn.ReLU(),
+        nn.BatchNorm1d(7 * 7 * 128),
+        nn.Unflatten(dim=1, unflattened_size=(128, 7, 7)), # (N, 128, 7, 7)
+        nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=4,
+          stride=2, padding=1), # (N, 64, 14, 14), 'same padding'
+                                # 14 = 7 + 6*(stride-1) + 2 * (dilation*(kernel_size-1)-padding)
+                                #      - (kernel_size-1)
+        nn.ReLU(),
+        nn.BatchNorm2d(64),
+        nn.ConvTranspose2d(in_channels=64, out_channels=1, kernel_size=4,
+          stride=2, padding=1), # (N, 1, 28, 28), use 'same padding'
+        nn.Tanh(),
+        nn.Flatten() # (N, 784)
+    )
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
