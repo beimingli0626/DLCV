@@ -1,3 +1,8 @@
+<div>
+  <h2 align="center"><a href="https://web.eecs.umich.edu/~justincj/teaching/eecs498/WI2022/">EECS 498/598: Deep Learning for Computer Vision</a></h2>
+  <h2 align="center"><a href="https://web.eecs.umich.edu/~justincj/teaching/eecs498/WI2022/assignment2.html">Assignment 2</a></h3>
+</div>
+
 # Goals
 
 In this assignment, you will implement various image classification models, based on the SVM / Softmax / Two-layer Neural Network. The goals of this assignment are as follows:

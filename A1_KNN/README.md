@@ -1,3 +1,8 @@
+<div>
+  <h2 align="center"><a href="https://web.eecs.umich.edu/~justincj/teaching/eecs498/WI2022/">EECS 498/598: Deep Learning for Computer Vision</a></h2>
+  <h2 align="center"><a href="https://web.eecs.umich.edu/~justincj/teaching/eecs498/WI2022/assignment1.html">Assignment 1</a></h3>
+</div>
+
 # Goals
 
 In this assignment you will practice putting together a simple image classification pipeline based on the k-Nearest Neighbor or the SVM/Softmax classifier. The goals of this assignment are as follows:
