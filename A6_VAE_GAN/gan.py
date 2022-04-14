@@ -279,7 +279,7 @@ def build_dc_generator(noise_dim=NOISE_DIM):
     model = nn.Sequential(
         nn.Linear(noise_dim, 1024),
         nn.ReLU(),
-        nn.BatchNorm1d(1024),
+        nn.BatchNorm1d(num_features=1024), # expect input (N, C) or (N, C, L), C is the number of features
         nn.Linear(1024, 7 * 7 * 128),
         nn.ReLU(),
         nn.BatchNorm1d(7 * 7 * 128),
@@ -289,7 +289,7 @@ def build_dc_generator(noise_dim=NOISE_DIM):
                                 # 14 = 7 + 6*(stride-1) + 2 * (dilation*(kernel_size-1)-padding)
                                 #      - (kernel_size-1)
         nn.ReLU(),
-        nn.BatchNorm2d(64),
+        nn.BatchNorm2d(num_features=64), # expect input (N, C, H, W), C is the number of features
         nn.ConvTranspose2d(in_channels=64, out_channels=1, kernel_size=4,
           stride=2, padding=1), # (N, 1, 28, 28), use 'same padding'
         nn.Tanh(),

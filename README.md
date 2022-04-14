@@ -28,5 +28,13 @@ Generative Adversarial Networks have the power generate novel data that mimic th
 |:------------------------------------------:|:------------------------------------------------:|:-------------------------------------------------------:|
 |                Vanilla GAN                 |                Least-Squares GAN                 |                Deeply-Convolutional GAN                 |
 
+### Class Visualization
+By starting with a random noise image and performing gradient ascent on a target class, we can generate an image that the network will recognize as the target class. Illustrations below are generated with above technique, based on pre-trained SqueezeNet on ImageNet dataset. Those animations show changes on the synthetic image during training for different classes. You can identify some specific patterns/shapes for these particular classes.
+
+| ![Tarantula](results/tarantula.gif) | ![Hourglass](results/hourglass.gif) |
+|:-----------------------------------:|:-----------------------------------:|
+|             Tarantula               |              Hourglass              |
+
+
 ## Credits
 As the BEST course I've ever taken, I really appreciate the effort of all instructors. It's a great start point for anyone who wants to step into CV-related industry or academia. For public course materials, you can visit [EECS 498.008 / 598.008 Deep Learning for Computer Vision](https://web.eecs.umich.edu/~justincj/teaching/eecs498/WI2022/) website.
