@@ -33,8 +33,13 @@ def content_loss(content_weight, content_current, content_original):
     ############################################################################
     # TODO: Compute the content loss for style transfer.                       #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    Content loss indicates how much the feature map of the generated image 
+    differs from the feature map of the source image
+    '''
+    loss = content_weight * torch.sum((content_current - content_original) ** 2)
+
+    return loss
     ############################################################################
     #                               END OF YOUR CODE                           #
     ############################################################################
@@ -59,8 +64,20 @@ def gram_matrix(features, normalize=True):
     # TODO: Compute the Gram matrix from features.                             #
     # Don't forget to implement for both normalized and non-normalized version #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    Gram matrix G which represents the correlations between the 
+    responses of each filter
+    '''
+    N, C, H, W = features.shape
+
+    f = features.view(N, C, H * W)
+    tr_f = torch.transpose(f, 1, 2) # (N, H * W, C)
+
+    gram = f @ tr_f # (N, C, C)
+
+    # Optionally, normalize the Gram matrix.
+    if normalize:
+        gram /= (H * W * C)
     ############################################################################
     #                               END OF YOUR CODE                           #
     ############################################################################
@@ -92,8 +109,23 @@ def style_loss(feats, style_layers, style_targets, style_weights):
     # should not be very much code (~5 lines).                                 #
     # You will need to use your gram_matrix function.                          #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    We want the activation statistics of our generated image to match the 
+    activation statistics of our style image, and matching the (approximate) 
+    covariance is one way to do that.
+    '''
+    loss = 0.0
+
+    for idx, layer_idx in enumerate(style_layers):
+      # Compute Gram matrix of features of current layer
+      current_gram = gram_matrix(feats[layer_idx])
+
+      # Add current layer style loss.
+      loss += style_weights[idx] \
+                    * torch.sum((current_gram - style_targets[idx]) ** 2)
+
+    return loss
+
     ############################################################################
     #                               END OF YOUR CODE                           #
     ############################################################################
@@ -115,8 +147,15 @@ def tv_loss(img, tv_weight):
     # TODO: Compute total variation loss.                                      #
     # Your implementation should be vectorized and not require any loops!      #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    Encourage smoothness in the image
+    '''
+    verti = torch.sum((img[..., 1:, :] - img[..., :-1, :]) ** 2)
+    hori = torch.sum((img[..., 1:] - img[..., :-1]) ** 2)
+
+    loss = tv_weight * (verti + hori)
+
+    return loss
     ############################################################################
     #                               END OF YOUR CODE                           #
     ############################################################################
@@ -142,8 +181,22 @@ def guided_gram_matrix(features, masks, normalize=True):
     # calculate the Gram Matrix. You are allowed to use one for-loop in          #
     # this problem.                                                              #
     ##############################################################################
-    # Replace "pass" statement with your code
-    pass
+    N, R, C, H, W = features.shape
+
+    # Convert mask to be the same dimension as features
+    Guidance = masks.unsqueeze(dim=2).repeat(1, 1, C, 1, 1) # (N, R, C, H, W)
+
+    # Get spatially guided feature map
+    F = (features * Guidance).view(N, R, C, H*W) # (N, R, C, H*W)
+    F_t = torch.transpose(F, dim0=2, dim1=3)
+
+    # Get guided Gram Matrix
+    guided_gram = F @ F_t # (N, R, C, C)
+
+    # Optionally, normalize the Gram matrix.
+    if normalize:
+        guided_gram /= (H * W * C)
+    return guided_gram
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -166,7 +219,7 @@ def guided_style_loss(
     - style_weights: List of the same length as style_layers, where
       style_weights[i] is a scalar giving the weight for the style loss at layer
       style_layers[i].
-    - content_masks: List of the same length as style_layers, where
+    - content_masks: List of the same length as "feats", where
       content_masks[i] is a PyTorch Tensor giving the binary masks of the content
       image.
 
@@ -176,8 +229,23 @@ def guided_style_loss(
     ############################################################################
     # TODO: Computes the guided style loss at a set of layers.                 #
     ############################################################################
-    # Replace "pass" statement with your code
-    pass
+    '''
+    We want the activation statistics of our generated image to match the 
+    activation statistics of our style image, and matching the (approximate) 
+    covariance is one way to do that.
+    '''
+    loss = 0.0
+
+    for idx, layer_idx in enumerate(style_layers):
+      # Compute Gram matrix of features of current layer
+      current_guided_gram = guided_gram_matrix(feats[layer_idx], content_masks[layer_idx])
+
+      # Add current layer style loss.
+      loss += style_weights[idx] \
+                    * torch.sum((current_guided_gram - style_targets[idx]) ** 2)
+
+    return loss
+
     ############################################################################
     #                               END OF YOUR CODE                           #
     ############################################################################
